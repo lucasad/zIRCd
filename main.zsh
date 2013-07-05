@@ -2,10 +2,12 @@
 
 zmodload zsh/net/tcp zsh/zselect
 
-PORT=6667
+readonly PORT=6667
 ztcp -l $PORT || exit 255
-
 FD=$REPLY
+
+readonly VERSION="zIRCd 0.0.1~zsh-$ZSH_VERSION"
+readonly CREATED="$(date)"
 
 TRAPWINCH() {
     echo winch
@@ -27,6 +29,6 @@ echo Listening on port $PORT fd $FD
 while true
 do
     if ztcp -a $FD; then
-	env -i ./client.zsh $REPLY&
+	env -i CREATED="$CREATED" ./client.zsh $REPLY&
     fi
 done

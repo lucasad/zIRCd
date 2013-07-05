@@ -1,6 +1,11 @@
 #!/bin/zsh
+zmodload zsh/system zsh/net/socket zsh/mapfile zsh/sched
 IFS=" "
 SOCKFD=$1
+readonly CDIR=clients/$$/
+
+readonly VERSION=$VERSION
+readonly CREATED=$CREATED
 
 user=
 nick=
@@ -9,7 +14,10 @@ hostname=
 mode=
 
 integer fd
-zmodload zsh/system zsh/net/socket zsh/mapfile zsh/sched
+integer uOP=1  uNOT=2 uWOPS=4 uINVI=8
+
+. ./common.zsh
+
 
 function parse() {
     read command rest
@@ -33,13 +41,16 @@ function doCommand() {
 	    changeNick $params
 	    ;;
 	PRIVMSG)
-	    sendPRIVMSG $params
+	    sendMSG PRIVMSG $params
 	    ;;
 	NOTICE)
-	    sendNOTICE $params
+	    sendMSG NOTICE $params
 	    ;;
 	WHOIS)
 	    doWhois $params
+	    ;;
+	MODE)
+	    mode $params
 	    ;;
 	PONG)
 	    resetWD
@@ -65,8 +76,8 @@ function doInit() {
 }
 
 function resetWD() {
-    pingcookie=$RANDOM
-    echo :$HOST PING :$pingcookie
+    sched -1
+    echo :$HOST PING :$RANDOM
     sched +300 quit "Ping timeout"
 }
 
@@ -92,30 +103,6 @@ function doWhois() {
     echo :$HOST 318 $nick :End of WHOIS list
 }
 
-function sendPRIVMSG() {
-    targets=$1
-    if [ -z "$targets" ]; then
-	echo ":$HOST 411 :No recipient given PRIVMSG"
-	return 255
-    fi
-    MESSAGE=$2
-
-    if [ -z "$MESSAGE" ]; then
-	echo ":$HOST 412 :No text to send"
-	return 255
-    fi
-    IFS=, read -rA targets <<< "$targets"
-    MESSAGE=$2
-
-    for target in $targets; do
-	if [[ -h "target/$target" ]]; then
-	    echo ":$nick!$UPREFIX PRIVMSG $target :$MESSAGE" > "target/$target"
-	else
-	    echo ":$HOST 401 $target :No such nick/channel" >&$SOCKFD
-	fi
-    done
-}
-
 function setUser() {
     _user=$1
     _mode=$2
@@ -137,10 +124,10 @@ function setUser() {
     hostname=$_hostname
     realname=$_realname
 
-    cat <<< "$user" > "clients/$$/user"
-    cat <<< "$realname" > "clients/$$/realname"
-    cat <<< "$mode" > "clients/$$/mode"
-    cat <<< "$hostname" > "clients/$$/hostname"
+    mapfile["$CDIR/user"]=$user
+    mapfile["$CDIR/realname"]=$realname
+    mapfile["$CDIR/mode"]=$mode
+    mapfile["$CDIR/hostname"]=$hostname
 
     if [ -n "$nick" ]; then
       welcome
@@ -198,9 +185,12 @@ function changeNick() {
 
 function welcome() {
     echo :$HOST 001 $nick :Welcome to the Internet Relay Network $nick!$UPREFIX
-    echo :$HOST 002 $nick :Your host is $HOST, running version -1
+    echo :$HOST 002 $nick :Your host is $HOST, running version $VERSION
     echo :$HOST 003 $nick :This server was created $CREATED
-    echo :$HOST 004 $nick :$HOST -1 i l
+    echo :$HOST 004 $nick :$HOST $VERSION
+
+    echo :$HOST PING :$RANDOM
+    sched +300 quit "Ping timeout"
 }
 
 doInit
