@@ -1,27 +1,4 @@
-#!/bin/zsh
-
-readonly COMMAND=$1 NICK=$2
-shift 2
-case $COMMAND in
-    JOIN)
-	join $@
-	;;
-    PART)
-	part $@
-	;;
-    KICK)
-	kick $@
-	;;
-    TOPIC)
-	topic $@
-	;;
-    NAMES)
-	names $@
-	;;
-    MODE)
-	mode $@
-	;;
-esac
+#!/bin/zsh -x
 
 function validateChannel() {
     readonly channel=$1
@@ -30,15 +7,15 @@ function validateChannel() {
 	exit
     fi
 }
-function join() {
+function JOIN() {
     readonly channel=$1
     validateChannel $channel
 
-    [[ -e "target/$channel" ]] || ./spawnChannel $NICK $channel &
+    [[ -e "target/$channel" ]] || ./spawnChannel.zsh $NICK $channel &
     echo "JOIN $NICK" > "target/$channel"
 }
 
-function part() {
+function PART() {
     readonly channel=$1
     validateChannel $channel
     chanExist $channel
@@ -46,7 +23,7 @@ function part() {
     echo "PART $NICK" > "target/$channel"
 }
 
-function kick() {
+function KICK() {
     readonly channel=$1
     validateChannel $channel
     chanExist $channel
@@ -54,7 +31,7 @@ function kick() {
     echo "KICK $NICK" > "target/$channel"
 }
 
-function mode() {
+function MODE() {
     readonly channel=$1
     shift
     validateChannel $channel
@@ -63,7 +40,7 @@ function mode() {
     echo "MODE $NICK $@" > "target/$channel"
 }
 
-function topic() {
+function TOPIC() {
     readonly channel=$1
     validateChannel $channel
     if read topic < "channels/$channel/topic"; then
@@ -77,7 +54,7 @@ function topic() {
     fi
 }
 
-function names() {
+function NAMES() {
     readonly channel=$1
     shift
     validateChannel $channel
@@ -92,3 +69,7 @@ function chanExist () {
 	echo :$HOST 403 $NICK $CHANNEL :No such channel
     fi
 }
+
+readonly COMMAND=$1 NICK=$2
+shift 2
+$COMMAND $@

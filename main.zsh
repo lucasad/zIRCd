@@ -14,11 +14,11 @@ TRAPWINCH() {
 }
 
 TRAPINT() {
-    ztcp -c $FD
     for fd in $clients; do
 	ztcp -c $fd
     done
     pkill client.zsh
+    ztcp -c $FD
     exit 255
 }
 
