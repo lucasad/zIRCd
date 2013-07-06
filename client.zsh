@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/zsh -x
 zmodload zsh/system zsh/net/socket zsh/mapfile zsh/sched
 IFS=" "
 SOCKFD=$1
@@ -17,7 +17,6 @@ integer fd
 integer uOP=1  uNOT=2 uWOPS=4 uINVI=8
 
 . ./common.zsh
-
 
 function parse() {
     read command rest
@@ -52,6 +51,9 @@ function doCommand() {
 	MODE)
 	    mode $params
 	    ;;
+	TOPIC|PART|KICK|JOIN|NAMES)
+	    ./channel.zsh $command $nick $params
+	    ;;
 	PONG)
 	    resetWD
 	    ;;
@@ -76,9 +78,9 @@ function doInit() {
 }
 
 function resetWD() {
-    sched -1
-    echo :$HOST PING :$RANDOM
-    sched +300 quit "Ping timeout"
+    sched -${#zsh_scheduled_events}
+    sched +300 echo :$HOST PING :$RANDOM
+    sched +600 quit "Ping timeout"
 }
 
 function doWhois() {
@@ -183,6 +185,34 @@ function changeNick() {
     fi
 }
 
+function doMode() {
+    if [[ "$1" =~ $CHANRE ]]; then
+	./channel.zsh MODE $nick $@
+    else
+	mode $@
+    fi
+}
+
+function mode() {
+    if [[ ! "$1" == "$nick" ]]; then
+	echo :$HOST 502 $nick :Cannot change mode for other users
+	return
+    fi
+
+    pmode=+
+    if [ -z $2 ]; then
+        if (( $mode&4 )); then
+	    pmode=${pmode}w
+	fi
+	if (( $mode&8 )); then
+	    pmode=${pmode}i
+	fi
+	echo :$nick MODE $nick $pmode
+    else
+	:
+    fi
+}
+
 function welcome() {
     echo :$HOST 001 $nick :Welcome to the Internet Relay Network $nick!$UPREFIX
     echo :$HOST 002 $nick :Your host is $HOST, running version $VERSION
@@ -193,9 +223,24 @@ function welcome() {
     sched +300 quit "Ping timeout"
 }
 
+function sendALL() {
+    if channels=(/nicks/$nick/channels/*/sock); then
+	for channel in $channels; do
+	    echo $@ > $channel
+	done
+    fi
+}
+
+function quit() {
+    sendALL :$nick!$UPREFIX QUIT :$1
+    echo :$nick!$UPREFIX QUIT :$1
+    exec {SOCKFD}>&-
+    exit
+}
+
 doInit
 
-while read line
-do echo $line | sed 's/^:\S* //' | tr -d '\r' | parse >& $1; done <& $1
+while read -u$1 line
+do sed 's/^:\S* //' <<< "$line" | tr -d '\r' | parse >& $1; done
 
-exec {SOCKFD}>&-
+quit "Client Quit"
